@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>確認</title>
+  <style>
+    body{font-family:sans-serif;max-width:520px;margin:24px auto;padding:0 16px;}
+    h1{font-size:18px;margin:0 0 16px;}
+    button{width:100%;padding:14px;margin:8px 0;font-size:16px;border-radius:12px;border:1px solid #ccc;background:#fff;}
+    button:disabled{opacity:.5}
+    .small{color:#666;font-size:12px;margin-top:16px;line-height:1.6;}
+    .ok{color:#0a7}
+    .ng{color:#c33}
+  </style>
+</head>
+<body>
+  <h1>本日の確認</h1>
+
+  <button id="btnWork" onclick="send('出勤')">出勤</button>
+  <button id="btnOff"  onclick="send('欠勤')">欠勤</button>
+
+  <div class="small" id="msg">読み込み中…</div>
+
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <script>
+    // ▼差し替え
+    const LIFF_ID  = "YOUR_LIFF_ID";
+    const GAS_URL  = "YOUR_GAS_WEBAPP_URL"; // .../exec
+    const SHEET_ID = "YOUR_SHEET_ID";
+    const STORE_ID = "TEST_STORE";
+
+    const msg = (t, cls="") => {
+      const el = document.getElementById("msg");
+      el.className = "small " + cls;
+      el.textContent = t;
+    };
+
+    const setDisabled = (v) => {
+      document.getElementById("btnWork").disabled = v;
+      document.getElementById("btnOff").disabled  = v;
+    };
+
+    async function init() {
+      try{
+        await liff.init({ liffId: LIFF_ID });
+
+        // LIFF内で未ログインならログインへ
+        if (!liff.isLoggedIn()) {
+          msg("初回のみログインが必要です。画面の案内に従ってください。");
+          liff.login();
+          return;
+        }
+
+        // プロフィール取得（userId）
+        const profile = await liff.getProfile();
+        msg("起動OK（送信待ち）", "ok");
+
+      }catch(e){
+        msg("起動エラー：" + e, "ng");
+      }
+    }
+
+    async function send(status){
+      try{
+        setDisabled(true);
+        msg("送信中…");
+
+        const profile = await liff.getProfile();
+
+        const payload = {
+          sheetId: SHEET_ID,
+          storeId: STORE_ID,
+          status: status,
+          lineUserId: profile.userId,
+          note: ""
+        };
+
+        const res = await fetch(GAS_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify(payload)
+        });
+
+        const json = await res.json();
+        if(json.ok){
+          msg("送信しました。ありがとうございました。", "ok");
+          alert("送信しました");
+        }else{
+          msg("失敗：" + (json.error || "unknown"), "ng");
+          alert("失敗：" + (json.error || "unknown"));
+        }
+
+      }catch(e){
+        msg("送信エラー：" + e, "ng");
+        alert("送信エラー：" + e);
+      }finally{
+        setDisabled(false);
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>
